@@ -1,58 +1,40 @@
 from aiogram import F, Router
-from aiogram.filters import CommandStart , Command
-from aiogram.types import Message , CallbackQuery
-from aiogram.fsm.state import StatesGroup, State 
+from aiogram.filters import CommandStart, Command
+from aiogram.types import Message, CallbackQuery
+from aiogram.fsm.state import StatesGroup, State  
 from aiogram.fsm.context import FSMContext
+from asyncpg import Pool  
+from database import add_user_email , save_issue
 
-import keyboards.keyboard as kb ; 
+import keyboards.keyboard as kb
 
-router = Router()
+router = Router()  
 
-class Reg(StatesGroup):
-    name = State()
-    number = State()
+class UserStates(StatesGroup):
+    waiting_for_email = State()
+    waiting_for_issue = State()   
 
-@router.message(CommandStart())
-async def cmd_start(message : Message) :
-    await message.reply(f'Hello , {message.from_user.first_name}',
-                        reply_markup=kb.second)
+@router.message(CommandStart()) 
+async def start(message: Message, state: FSMContext):
+    await message.answer('Salem, e-mail engiz:')
+    await state.update_data(telegram_username=message.from_user.username)
+    await state.set_state(UserStates.waiting_for_email)  
 
-@router.message(Command('help'))
-async def get_help(message:Message):
-    await message.answer('This command name is help')
-
-@router.message(F.text == 'How are you?')
-async def how_are_you(message: Message):
-    await message.answer('OK!', reply_markup=kb.about_us)
-
-@router.callback_query(F.data == 'catalog')
-async def catalog(callback : CallbackQuery):
-    await callback.answer('You choose catalog', show_alert=True)
-    await callback.message.answer('Hello')
-
-@router.callback_query(F.data == 'basket')
-async def basket(callback : CallbackQuery):
-    await callback.answer('You choose basket') 
-    await callback.message.edit_text('Hello', reply_markup=await kb.inline_cars())
-
-    #edit-text to edit-caption if image
-
-@router.message(Command('reg'))
-async def reg_first_step(message : Message, state : FSMContext):
-    await state.set_state(Reg.name)
-    await message.answer('Введите ваше имя:')
-
-@router.message(Reg.name)
-async def reg_second_step(message : Message , state : FSMContext):
-    await state.update_data(name=message.text)
-    await state.set_state(Reg.number)
-    await message.answer('Введите номер телефона')
-
-@router.message(Reg.number)
-async def reg_third_step(message : Message , state : FSMContext):
-    await state.update_data(number = message.text)
+@router.message(UserStates.waiting_for_email) 
+async def process_email(message: Message, state: FSMContext, db: Pool):
     data = await state.get_data()
-    await message.answer(f'Salem , Reg ushin rahmet : \nName:{data["name"]}\nNumber:{data["number"]}')
-    await state.clear()
+    telegram_username = data["telegram_username"]
+    email = message.text   
+    await add_user_email(db, telegram_username, email)
+    await state.update_data(email=email)  
+    await message.answer("Problemandy ait: ")
+    await state.set_state(UserStates.waiting_for_issue)  
 
-    
+@router.message(UserStates.waiting_for_issue) 
+async def process_issue(message: Message, state: FSMContext, db: Pool):
+    user_data = await state.get_data()
+    telegram_username = user_data["telegram_username"]
+    issue_text = message.text  
+    await save_issue(db, telegram_username, issue_text)
+    await message.answer("Senin jalobyn saqtaldy")
+    await state.clear()

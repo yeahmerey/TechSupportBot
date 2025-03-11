@@ -1,15 +1,18 @@
 from aiogram import F, Router
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery , FSInputFile
 from aiogram.fsm.state import StatesGroup, State  
 from aiogram.fsm.context import FSMContext
 from asyncpg import Pool  
 from database import *  
 
+from datetime import datetime
+import pandas as pd 
+import os
 import keyboards.keyboard as kb
 
 router = Router()  
-
+admin = os.getenv('ADMIN_ID')
 class UserStates(StatesGroup):
     waiting_for_email = State()
     waiting_for_issue = State()   
@@ -143,3 +146,50 @@ async def select_suggestions(message: Message, state: FSMContext, db: Pool):
         await message.answer(response)
     else:
         await message.answer("You haven't submitted any suggestions yet.")
+
+@router.message(Command('getexcel'))
+@router.message(F.text.lower() == "getexcel")
+async def export_excel(message: Message, db: Pool):
+    
+    user_id = message.from_user.id
+
+    if user_id != int(admin):
+        await message.answer("you are not admin")
+        return 
+
+    try:
+        issues = await get_all_issues(db)
+
+        if not issues:
+            await message.answer("No issues found in the database.")
+            return
+
+        data = []
+        for issue in issues:
+            time_value = issue['time']
+            if hasattr(time_value, 'tzinfo') and time_value.tzinfo is not None:
+                time_value = time_value.replace(tzinfo=None)
+                
+            data.append({
+                'id': issue['id'],
+                'telegram_username': issue['telegram_username'],
+                'email': issue['email'],
+                'message': issue['message'],
+                'is_suggestion': issue['is_suggestion'],
+                'time': time_value
+            })
+
+        df = pd.DataFrame(data)
+        filename = f"issues_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        df.to_excel(filename, index=False)
+
+        file = FSInputFile(filename)
+        await message.answer_document(
+            document=file,
+            caption="Here is the exported data from issues"
+        )
+        os.remove(filename)
+
+    except Exception as e:
+        await message.answer(f"Error while exporting data: {str(e)}")

@@ -55,3 +55,14 @@ async def get_issues_by_email(pool, telegram_username, is_suggestion=False):
             """, 
             telegram_username, is_suggestion
         )
+    
+
+async def get_all_issues(pool) : 
+    async with pool.acquire() as conn :
+        return await conn.fetch(
+            """
+            SELECT id , telegram_username , email , message , is_suggestion , time
+            from issues
+            ORDER BY time DESC
+            """
+        )

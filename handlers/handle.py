@@ -1,6 +1,6 @@
 from aiogram import F, Router
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, CallbackQuery , FSInputFile
+from aiogram.types import Message, CallbackQuery , FSInputFile , InputFile
 from aiogram.fsm.state import StatesGroup, State  
 from aiogram.fsm.context import FSMContext
 from asyncpg import Pool  
@@ -13,10 +13,19 @@ import keyboards.keyboard as kb
 
 router = Router()  
 admin = os.getenv('ADMIN_ID')
+
+commands = {"getexcel","Report a bug🐞","Make a suggestion💎","My applications📜","My suggestions📝" }
+
 class UserStates(StatesGroup):
     waiting_for_email = State()
     waiting_for_issue = State()   
     waiting_for_suggestion = State()
+
+
+
+#TO-DO : add checking when a user write a command as sugg/bug. 
+
+
 
 @router.message(CommandStart())
 async def start(message : Message , state : FSMContext):
@@ -58,6 +67,7 @@ async def report_bug(message : Message , state : FSMContext, db : Pool):
     if email:
         await state.update_data(email=email)
         await message.answer("Enter your problem:")
+    
         await state.set_state(UserStates.waiting_for_issue)
     else:
         await message.answer("Please enter your email first: (Example: example@kbtu.kz)")
@@ -146,6 +156,21 @@ async def select_suggestions(message: Message, state: FSMContext, db: Pool):
         await message.answer(response)
     else:
         await message.answer("You haven't submitted any suggestions yet.")
+
+@router.message(F.text == "About me🦺")
+async def about_me(message : Message) : 
+    photoPath = "photo/image.jpg"
+    caption = (
+        "🤖 *TechSupportBot*\n\n"
+        "Привет! Я — ваш личный помощник по технической поддержке. 🚀\n\n"
+        "🔹 *Что я умею?*\n"
+        "✅ Принимать заявки и передавать их специалистам.\n"
+        "🔔 Уведомлять о статусе заявки.\n"
+        "📜 Вести историю обработки заявок.\n"
+        "🛠 Обеспечивать администраторов инструментами управления.\n\n"
+    )
+    await message.answer_photo(photo=FSInputFile(photoPath) , caption=caption , reply_markup=kb.more ,  parse_mode="Markdown")
+
 
 @router.message(Command('getexcel'))
 @router.message(F.text.lower() == "getexcel")

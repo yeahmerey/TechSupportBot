@@ -11,3 +11,8 @@ welcome = ReplyKeyboardMarkup(
     resize_keyboard=True ,
     input_field_placeholder="Select one :"
 )
+
+more = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="See GitHub Code : ", url="https://github.com/yeahmerey/TechSupportBot")],
+    [InlineKeyboardButton(text="Connect with creator",url="https://www.linkedin.com/in/merey-kaliyev-27b3a42a1/")]
+])
